@@ -1,0 +1,221 @@
+IR_in 1 | IR_out 1 | M_in 1 | M_out 1 | PC_in 1 | ALU_sel 3 | r1_en 1 | r2_en 1 | r1_sel 3 | r2_sel 3
+
+
+potential v2:
+spec:
+multiple buses ala ARM 1, A bus, B bus, write bus, read bus, address bus
+
+MICROCODE
+ADDRESS: OPCODE | STAGE/2 | UOPS
+
+UOPS:
+PC_i /1 | IR_i /1 | addrbus_out /4
+
+
+Instruction word - 16
+note: this immediate enable format is nicer but its worse for expansion i.e. if the word was expanded, the immediates
+would have to be spread out across multiple areas
+
+fetch states
+0 - load bus with PC, block MAR
+1 - load PRE-IR with memory return, increment PC
+2 - if status execution 0, push to IR
+3 - reset circuit
+
+A-variant
+4 - opcode
+3 - Sr1/Dr
+3 - Sr2
+5 - imm5 (immediate)
+1 - Imm_E - 1
+
+
+AB-variant
+4 - opcode
+3 - Dr
+3 - Sr1
+3 - Sr2
+2 - 0
+1 - Imm_E - 0
+
+
+B-variant
+4 - opcode
+3 - Op1
+9 - Imm9 (offset)
+
+C-variant
+4 - opcode
+12 - Imm12 (long_offset)
+
+//ALUCTL - 10
+alulatch
+00 - none
+01 - B
+10 - A
+3 - A/B
+
+
+alusel (alu select, selects opcode) /4
+0000 - disable
+
+
+aluwrite (alu write) /2
+0 - disable
+1 - ALU operation to write bus
+2 - EFLAGS to write bus
+
+flags_enable //enable writing to flags register /1
+
+//reserved /1
+
+
+//INSTRUCTION CONTROL/ 8
+
+
+PC_ctl /1
+00 - disable1
+10 - PC_i
+01 - PC_o
+
+IR_i /1
+
+addrbusctl - address bus control - read /2
+00 - interrupt address
+01 - from write bus
+
+//2 reservedf
+seqctl - Sequence control
+0 - End instruction
+1 - Next microinstruction
+2 - Compare Op1, Op2 to write bus, if not 0, continue execution, else halt
+
+
+
+//REGISTERS /16
+
+regselect /8
+-bus A /4
+0 - none
+1 - Op1
+2 - Op2
+3 - Op3
+
+-bus B /4
+0 - none
+1 - Op1
+2 - Op2
+3 - Op3
+
+imm_e - enable immediate /1
+
+imm_ctl /2
+00
+1 - imm5
+2 - imm9
+3 - imm12
+
+reg_write_ctl - inhale into Dr from Write bus
+
+//reserved 4
+
+
+//MEMORY // 8
+memctl
+0 - none
+1 - MDR to B
+2 - B to MAR
+3 - --
+
+//reserved 4
+
+
+
+
+BRANCH //1
+shifter - 3
+    byte to word
+ALU latch to A
+    true
+ALU mode
+    add for branch/fault destination
+ALU latch to B
+    true
+Update PSR from PSR bank signal - false
+PSR write - false
+data to B - false
+PSR to B - false
+Register to A/B - 2
+    R15, Rn
+ALU bus to register - 0
+    Rn
+Opcode fetch - true
+Pipeline control - true
+Write to register 
+    none
+Write to R15 - false
+Address bus write control
+    ALU bus
+Undefined instruction - false
+Read/Write select (?) - R
+Priority encoder to A
+    false
+Immediate allow enable - 0
+Immediate extraction type
+    24 bits (branch offset)
+
+//2
+shifter - 2
+    ASL 2 instruction
+ALU latch to A
+    false
+ALU mode - 1
+    add for branch/fault destination
+ALU latch to B
+    true
+Update PSR from PSR bank signal - false
+PSR write - false
+data to B - false
+PSR to B
+    true
+Register to A/B - 0
+    Rn/Rm
+ALU bus to register - 3
+    R14
+Opcode fetch - true
+Pipeline control - true
+Write to register 
+    none
+Write to R15 - false
+Address bus write control
+    ALU bus
+Undefined instruction - false
+Read/Write select (?) - R
+Priority encoder to A
+    false
+Immediate allow enable - 0
+Immediate extraction type
+    24 bits (branch offset)
+
+R1CTL
+n
+Op1
+Op2
+Op3
+
+R2CTL
+n
+Op1
+Op2
+Op3
+
+RWCTL
+n
+Op1
+Op2
+Op3
+
+ABUSCTL
+none
+Addrbus
+Op1Op2RAW

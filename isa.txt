@@ -1,0 +1,62 @@
+
+
+br (n z p) pc+imm
+00001 xxx XXXXXXXX
+
+jmp pc + sr
+00010 xxx 11111111
+
+add dr, sr, imm
+add dr, sr1, sr2
+10000 xxx xxx XXXX E
+sub dr, sr, imm
+sub dr, sr, sr2
+10001
+mul dr, sr
+10010
+imul dr, sr
+and dr, sr, imm
+and dr, sr1, sr2
+10011
+or dr, sr, imm
+or dr, sr1, sr2
+10100
+xor dr, sr1, sr2
+xor dr, sr, imm
+10101
+lsr dr, sr, imm
+10110
+asr dr, sr, imm
+10111
+asl dr, sr, imm
+11000
+
+mov dr, sr
+mov dr, imm 7?
+01000
+
+ld dr, pc+imm
+ld dr, sr
+ldi dr, pc+imm
+01001
+
+st dr, pc+imm
+st dr, sr
+01011
+sti dr, pc+imm
+01010
+
+call pc+imm
+call sr
+11001
+ret
+11010
+
+
+int vector
+11100
+
+push sr
+11111
+pop dr
+11110
