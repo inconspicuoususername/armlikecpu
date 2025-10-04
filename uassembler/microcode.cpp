@@ -60,20 +60,21 @@ struct ucode_t {
     {
         END,
         NEXT,
-        IFOP12W
+        IFOP12W // if non zero on write bus, go to next seq, else end. used for branching
     } seqsctl : 2;
 
     //CONTROL
     u32 pc_in : 1; //PC in from addrbus
     u32 fetch : 1; //THIS MUST BE ON WHILE END IS NEXT SEQUENCE OR THE CPU WILL FREEZE
-    enum class addrbus_out_t {
+    enum class addrbus_out_t
+    {
         NONE,
-        MAR,
-        WBUS,
-        PC,
-        PCINC,
-        TRAP_BASE
-    } addrbusctl : 3; //addrbus write control
+        MAR,          // mar out to addrbus
+        WBUS,         // write bus out to addrbus
+        PC,           // pc out to addrbus
+        PCINC,        // pc+1 out to addrbus
+        TRAP_BASE     // trap vector base address out to addrbus
+    } addrbusctl : 3; // addrbus write control
 
     u32 pc_out_a: 1; //pc out to A
 
@@ -81,30 +82,31 @@ struct ucode_t {
     enum class regabctl_t
     {
         NONE,
-        Op2A_Op3B, //001 // Op1, Op2, Op3 (add dr, sr1, sr2) / (add dr, sr1, imm5/imm4e)
-        Op2B, //010 //Op1, Op2, NOTHING (not dr, sr) / (not dr, imm8/7e)
-        Op1B,//011 //Op1 (jmp op1) / (jmp imm11/10e)
-        Op12_DIRECT_A //100
-        //PCA, // //PC+Imm12
+        Op2A_Op3B,   // 001 // Op1, Op2, Op3 (add dr, sr1, sr2) / (add dr, sr1, imm5)
+        Op2B,        // 010 //Op1, Op2, NOTHING (not dr, sr) / (not dr, imm8)
+        Op1B,        // 011 //Op1 (jmp op1) / (jmp imm11)
+        Op1_DIRECT_A // 100 //Op1 bits directly to A bus (br(5) NZP(A) imm8) -> NZP A, EFLAGS B
+        // PCA, // //PC+Imm12
     } regabctl : 3;
 
     enum class regwctl_t
     {
         none,
-        Op1,
-        R7,
-        R6_LINK
+        Op1,    // write to register op1
+        R7,     // write to R7 (for CALL/RET), for return address
+        R6_LINK // write to R6 (for PUSH/POP) R6 is stack pointer
     } regwctl : 2;
 
     u32 _pad21 : 1;
 
     u32 immsel : 1; //immediate bit enable
-    enum class immctl_t {
+    enum class immctl_t
+    {
         disable,
-        Imm5,
-        Imm11,
-        Imm8
-    } immctl : 2; //immediate mode
+        Imm5,     // instruction + op1and2? + 5 bit
+        Imm11,    // instruction + 11 bit
+        Imm8      // instruction + op1 + 8 bit
+    } immctl : 2; // immediate mode
 
     u32 _pad2 : 1;
 
@@ -281,7 +283,41 @@ int main()
     MOV.alu_writectl = ucode_t::alu_writectl_t::RESULT;
     write_u(&MOV, 0b01000);
 
+    ucode_t BR[3] = {};
+    ucode_t &BR1 = BR[0];
+    // alu latch b = flags
+    // writectl flags to b, flags -> b -> alu Op 2
+    // continue if alu is non zero
+    BR1.seqsctl = ucode_t::seqsctl_t::IFOP12W;
+    BR1.addrbusctl = ucode_t::addrbus_out_t::NONE;
+    BR1.fetch = 0;
+    BR1.regabctl = ucode_t::regabctl_t::Op1_DIRECT_A;
+    BR1.regwctl = ucode_t::regwctl_t::none;
+    BR1.alu_latch_a = 1;
+    BR1.alu_latch_b = 1;
+    BR1.alu_opsel = ucode_t::alu_opsel_t::AND;
+    BR1.alu_writectl = ucode_t::alu_writectl_t::EFLAGS;
+    BR1.alu_eflags_en = 1;
 
+    ucode_t &BR2 = BR[1];
+    BR2.seqsctl = ucode_t::seqsctl_t::NEXT;
+    BR2.addrbusctl = ucode_t::addrbus_out_t::WBUS;
+    BR2.pc_in = 1;
+    BR2.fetch = 0;
+    BR2.regabctl = ucode_t::regabctl_t::NONE;
+    BR2.pc_out_a = 1;
+    BR2.alu_latch_a = 1;
+    BR2.alu_latch_b = 1;
+    BR2.alu_opsel = ucode_t::alu_opsel_t::ADD;
+    BR2.alu_writectl = ucode_t::alu_writectl_t::RESULT;
+    BR2.immsel = 1;
+    BR2.immctl = ucode_t::immctl_t::Imm8;
+
+    ucode_t &BR3 = BR[2];
+    BR3.seqsctl = ucode_t::seqsctl_t::END;
+    BR3.fetch = 1;
+
+    write_u(BR, 0b11100, 3);
 
     ucode_t& LDa = LD[0];
     LDa.seqsctl = ucode_t::seqsctl_t::NEXT;
